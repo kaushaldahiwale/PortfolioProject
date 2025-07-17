@@ -1,131 +1,139 @@
--- Cleaning data in sql
+ -- Cleaning data in SQL
+SELECT *
+FROM   housing_data
 
-Select *
-from housing_data
+--Formatting the SaleDate
+SELECT saledate,
+       CONVERT(DATE, saledate)
+FROM   housing_data
 
+UPDATE housing_data
+SET    saledate = CONVERT(DATE, saledate)
 
---Formating the SaleDate
+ALTER TABLE housing_data
+  ADD date_new DATE
 
-Select SaleDate, CONVERT(date,SaleDate)
-from housing_data
-
-Update housing_data
-set SaleDate = CONVERT(date,SaleDate)
-
-Alter Table housing_data
-add Date_New Date
-
-Update housing_data
-set Date_New = CONVERT(date,SaleDate)
+UPDATE housing_data
+SET    date_new = CONVERT(DATE, saledate)
 
 --Populate Missing PropertyAddress Data
+SELECT a.parcelid,
+       a.propertyaddress,
+       b.parcelid,
+       b.propertyaddress,
+       Isnull (a.propertyaddress, b.propertyaddress)
+FROM   housing_data a
+       JOIN housing_data b
+         ON a.parcelid = b.parcelid
+            AND a.[uniqueid] <> b.[uniqueid]
+WHERE  a.propertyaddress IS NULL
 
-select a.parcelID,a.propertyaddress,b.parcelId,b.propertyaddress,isnull (a.propertyaddress,b.PropertyAddress)
-from housing_data a
-join housing_data b
-on a.parcelID = b.parcelID
-and a.[UniqueID ] <> b.[UniqueID ]
-where a.PropertyAddress is null
-
-update a 
-set propertyaddress = isnull (a.propertyaddress,b.PropertyAddress)
-from housing_data a
-	join housing_data b
-	on a.parcelID = b.parcelID
-	and a.[UniqueID ] <> b.[UniqueID ]
-	where a.PropertyAddress is null
+UPDATE a
+SET    propertyaddress = Isnull (a.propertyaddress, b.propertyaddress)
+FROM   housing_data a
+       JOIN housing_data b
+         ON a.parcelid = b.parcelid
+            AND a.[uniqueid] <> b.[uniqueid]
+WHERE  a.propertyaddress IS NULL
 
 -- Breaking Address into address,city,state
-select 
-substring (propertyaddress, 1, CHARINDEX (',',propertyaddress) -1) as address,
-substring (Propertyaddress, charindex(',',propertyaddress) +1, len(propertyaddress)) as address
-from housing_data
+SELECT Substring (propertyaddress, 1, Charindex (',', propertyaddress) - 1) AS
+       address,
+       Substring (propertyaddress, Charindex(',', propertyaddress) + 1, Len(
+       propertyaddress))                                                    AS
+       address
+FROM   housing_data
 
-alter table housing_data
-add StreetName nvarchar(255)
+ALTER TABLE housing_data
+  ADD streetname NVARCHAR(255)
 
-alter table housing_data
-add City nvarchar(255)
+ALTER TABLE housing_data
+  ADD city NVARCHAR(255)
 
-update housing_data
-set StreetName = substring (propertyaddress, 1, CHARINDEX (',',propertyaddress) -1)
+UPDATE housing_data
+SET    streetname = Substring (propertyaddress, 1,
+                    Charindex (',', propertyaddress) - 1
+                           )
 
-update housing_data
-set City = substring (Propertyaddress, charindex(',',propertyaddress) +1, len(propertyaddress))
+UPDATE housing_data
+SET    city = Substring (propertyaddress, Charindex(',', propertyaddress) + 1,
+              Len(
+                            propertyaddress))
 
 -- breaking owner address 
+SELECT Parsename (Replace(owneraddress, ',', '.'), 3),
+       Parsename (Replace(owneraddress, ',', '.'), 2),
+       Parsename (Replace(owneraddress, ',', '.'), 1)
+FROM   housing_data;
 
-select 
-parsename (replace(OwnerAddress,',','.') ,3),
-parsename (replace(OwnerAddress,',','.') ,2),
-parsename (replace(OwnerAddress,',','.') ,1)
-from housing_data;
+ALTER TABLE housing_data
+  ADD ownerstreet NVARCHAR(255)
 
-alter table housing_data
-add OwnerStreet nvarchar(255)
+ALTER TABLE housing_data
+  ADD ownercity NVARCHAR(255)
 
-alter table housing_data
-add OwnerCity nvarchar(255)
+ALTER TABLE housing_data
+  ADD ownerstate NVARCHAR(255)
 
-Alter table housing_data
-add OwnerState nvarchar(255)
+UPDATE housing_data
+SET    ownerstreet = Parsename (Replace(owneraddress, ',', '.'), 3)
 
-update housing_data
-set OwnerStreet = parsename (replace(OwnerAddress,',','.') ,3)
+UPDATE housing_data
+SET    ownercity = Parsename (Replace(owneraddress, ',', '.'), 2)
 
-update housing_data
-set OwnerCity = parsename (replace(OwnerAddress,',','.') ,2)
-
-update housing_data
-set OwnerState = parsename (replace(OwnerAddress,',','.') ,1)
-
+UPDATE housing_data
+SET    ownerstate = Parsename (Replace(owneraddress, ',', '.'), 1)
 
 --changing y to yes and no to vacant in SoldasVacant
+SELECT soldasvacant,
+       CASE
+         WHEN soldasvacant = 'Y' THEN 'Yes'
+         WHEN soldasvacant = 'N' THEN 'No'
+         ELSE soldasvacant
+       END
+FROM   housing_data
 
-select SoldAsVacant, 
-	case when SoldAsVacant = 'Y' then 'Yes' 
-		 when SoldAsVacant = 'N' then 'No'
-		 Else SoldAsVacant 
-		 end
-from housing_data
+UPDATE housing_data
+SET    soldasvacant = CASE
+                        WHEN soldasvacant = 'Y' THEN 'Yes'
+                        WHEN soldasvacant = 'N' THEN 'No'
+                        ELSE soldasvacant
+                      END
 
-update housing_data
-set soldasvacant = case when SoldAsVacant = 'Y' then 'Yes' 
-		 when SoldAsVacant = 'N' then 'No'
-		 Else SoldAsVacant 
-		 end
-
-select distinct soldasvacant
-from housing_data
-group by SoldAsVacant;
+SELECT DISTINCT soldasvacant
+FROM   housing_data
+GROUP  BY soldasvacant;
 
 --removing duplicates
-with RowNumCTE as (
-select *, row_number() over(partition by parcelid,propertyaddress,saleprice,saledate,legalreference 
-order by uniqueid) as row_num
-from housing_data
-)
+WITH rownumcte
+     AS (SELECT *,
+                Row_number()
+                  OVER(
+                    partition BY parcelid, propertyaddress, saleprice, saledate,
+                  legalreference
+                    ORDER BY uniqueid) AS row_num
+         FROM   housing_data)
+SELECT *
+FROM   rownumcte
+WHERE  row_num > 1;
 
-select *
-from RowNumCTE 
-where row_num > 1;
-
-with RowNumCTE2 as (
-select *, row_number() over(partition by parcelid,propertyaddress,saleprice,saledate,legalreference 
-order by uniqueid) as row_num
-from housing_data
-)
-delete 
-from RowNumCTE2
-where row_num > 1
+WITH rownumcte2
+     AS (SELECT *,
+                Row_number()
+                  OVER(
+                    partition BY parcelid, propertyaddress, saleprice, saledate,
+                  legalreference
+                    ORDER BY uniqueid) AS row_num
+         FROM   housing_data)
+DELETE FROM rownumcte2
+WHERE  row_num > 1
 
 --deleting unused column
+SELECT *
+FROM   housing_data
 
-select *
-from housing_data
+ALTER TABLE housing_data
+  DROP COLUMN propertyaddress, owneraddress
 
-alter table housing_data
-drop column propertyaddress,owneraddress
-
-alter table housing_data
-drop column saledate
+ALTER TABLE housing_data
+  DROP COLUMN saledate  
